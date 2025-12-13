@@ -13,6 +13,7 @@ const int WINDOW_WIDTH = 400;
 const int WINDOW_HEIGHT = 533;
 const int PLATFORM_COUNT = 10;
 const int PLATFORM_SPACING = 60; // Increased spacing for less crowding
+const int MIN_PLATFORMS = 4;     // Minimum platforms in game (hard mode)
 const int PLAYER_WIDTH = 50;
 const int PLAYER_HEIGHT = 70;
 const int PLATFORM_WIDTH = 68;
@@ -24,6 +25,7 @@ const int SCREEN_BOUNDARY_RIGHT = 350;
 const int SCREEN_BOUNDARY_LEFT = 0;
 const int CAMERA_THRESHOLD = 200;
 const int SCORE_INCREMENT = 1;                 // Increased frequency of score updates
+const int DIFFICULTY_SCORE_THRESHOLD = 100;    // Score needed to reduce platforms by 1
 const Color HOVER_COLOR = Color(255, 200, 87); // Golden
 const Color TEXT_COLOR = Color::White;
 const Color SECONDARY_TEXT_COLOR = Color(200, 220, 255); // Light blue
@@ -134,7 +136,7 @@ int main()
     Text controlsText(font);
     controlsText.setCharacterSize(12);
     controlsText.setFillColor(SECONDARY_TEXT_COLOR);
-    controlsText.setString("← → Arrow Keys to Move\nSPACE to Pause");
+    controlsText.setString("LEFT/RIGHT Arrow Keys\nSPACE to Pause");
 
     Text hsLabelText(font);
     hsLabelText.setCharacterSize(14);
@@ -187,7 +189,7 @@ int main()
     Text separator1(font);
     separator1.setCharacterSize(14);
     separator1.setFillColor(SECONDARY_TEXT_COLOR);
-    separator1.setString("─────────────────");
+    separator1.setString("_____________________________________________________________________");
 
     Text highScoreLabel(font);
     highScoreLabel.setCharacterSize(16);
@@ -228,7 +230,10 @@ int main()
     int currentScore = 0;
     int highScore = loadHighScore();
     int maxHeight = WINDOW_HEIGHT;
-    int minPlayerY = WINDOW_HEIGHT; // Track minimum Y position reached by player
+    int minPlayerY = WINDOW_HEIGHT;         // Track minimum Y position reached by player
+    int activePlatforms = PLATFORM_COUNT;   // Number of active platforms (decreases with difficulty)
+    int lastDifficultyLevel = 0;            // Track previous difficulty to detect changes smoothly
+    int lastPlatformY = WINDOW_HEIGHT - 80; // Track last platform Y position for jump distance
 
     // Game objects
     point plat[PLATFORM_COUNT];
@@ -240,23 +245,38 @@ int main()
     // Initialize platforms
     auto initializePlatforms = [&]()
     {
+        // Create platforms based on current difficulty
+        activePlatforms = PLATFORM_COUNT - (currentScore / DIFFICULTY_SCORE_THRESHOLD);
+        if (activePlatforms < MIN_PLATFORMS)
+        {
+            activePlatforms = MIN_PLATFORMS;
+        }
+
         // Create platforms evenly spaced throughout the screen
         for (int i = 0; i < PLATFORM_COUNT; i++)
         {
-            plat[i].x = rand() % (SCREEN_BOUNDARY_RIGHT - PLATFORM_WIDTH);
-            plat[i].y = i * PLATFORM_SPACING;
-            platScored[i] = false; // Reset scoring status
+            if (i < activePlatforms)
+            {
+                plat[i].x = rand() % (SCREEN_BOUNDARY_RIGHT - PLATFORM_WIDTH);
+                plat[i].y = i * PLATFORM_SPACING;
+                platScored[i] = false; // Reset scoring status
+            }
+            else
+            {
+                // Disable unused platforms by placing them off-screen
+                plat[i].y = -PLATFORM_HEIGHT * 2;
+                platScored[i] = false;
+            }
         }
         // Ensure there's always a platform directly beneath the starting position
         // Place a platform at the bottom where the player starts
-        plat[9].x = WINDOW_WIDTH / 2 - PLATFORM_WIDTH / 2;
-        plat[9].y = WINDOW_HEIGHT - 80;
-        platScored[9] = false; // Reset starting platform scoring
+        plat[activePlatforms - 1].x = WINDOW_WIDTH / 2 - PLATFORM_WIDTH / 2;
+        plat[activePlatforms - 1].y = WINDOW_HEIGHT - 80;
 
         maxHeight = WINDOW_HEIGHT;
         minPlayerY = WINDOW_HEIGHT;
-        currentScore = 0;
         frameCounter = 0;
+        lastPlatformY = WINDOW_HEIGHT - 80; // Reset jump distance tracker
     };
 
     initializePlatforms();
@@ -316,6 +336,7 @@ int main()
                         if (playButtonBounds.contains(mousePos))
                         {
                             state = PLAYING;
+                            currentScore = 0; // Reset score for new game
                             initializePlatforms();
                             x = WINDOW_WIDTH / 2;
                             y = WINDOW_HEIGHT - 145;
@@ -349,6 +370,7 @@ int main()
                         if (gameOverPlayAgainButtonBounds.contains(mousePos))
                         {
                             state = PLAYING;
+                            currentScore = 0; // Reset score for new game
                             initializePlatforms();
                             x = WINDOW_WIDTH / 2;
                             y = WINDOW_HEIGHT - 145;
@@ -393,7 +415,7 @@ int main()
             y += (int)dy;
 
             // Collision detection with platforms
-            for (int i = 0; i < PLATFORM_COUNT; i++)
+            for (int i = 0; i < activePlatforms; i++)
             {
                 if ((x + PLAYER_WIDTH / 2 > plat[i].x) &&
                     (x + PLAYER_WIDTH / 2 < plat[i].x + PLATFORM_WIDTH) && (y + PLAYER_HEIGHT > plat[i].y) &&
@@ -405,8 +427,34 @@ int main()
                     // Award points if this platform hasn't been scored yet
                     if (!platScored[i])
                     {
-                        currentScore += 10;   // Points per platform
+                        // Calculate jump distance (vertical distance from last platform)
+                        int jumpDistance = lastPlatformY - plat[i].y;
+
+                        // Award points based on jump distance
+                        // Longer jumps reward more points
+                        if (jumpDistance >= 80)
+                        {
+                            currentScore += 2; // Long jump: +2 points
+                        }
+                        else
+                        {
+                            currentScore += 1; // Short jump: +1 point
+                        }
+
+                        // Update last platform position for next jump calculation
+                        lastPlatformY = plat[i].y;
                         platScored[i] = true; // Mark platform as scored
+
+                        // Calculate current difficulty level based on new score
+                        int currentDifficultyLevel = currentScore / DIFFICULTY_SCORE_THRESHOLD;
+                        int newActivePlatforms = PLATFORM_COUNT - currentDifficultyLevel;
+                        if (newActivePlatforms < MIN_PLATFORMS)
+                        {
+                            newActivePlatforms = MIN_PLATFORMS;
+                        }
+
+                        // Update active platforms smoothly without sudden reinitialization
+                        activePlatforms = newActivePlatforms;
                     }
                 }
             }
@@ -425,7 +473,7 @@ int main()
             // Camera follow: when player goes up, scroll platforms
             if (y < h)
             {
-                for (int i = 0; i < PLATFORM_COUNT; i++)
+                for (int i = 0; i < activePlatforms; i++)
                 {
                     y = h;
                     plat[i].y = plat[i].y - (int)dy;
@@ -436,9 +484,9 @@ int main()
                         plat[i].y = -PLATFORM_HEIGHT;
                         platScored[i] = false; // Reset scoring status for recycled platform
 
-                        // Find the highest platform to maintain spacing
+                        // Find the highest active platform to maintain spacing
                         int maxPlatformY = 0;
-                        for (int j = 0; j < PLATFORM_COUNT; j++)
+                        for (int j = 0; j < activePlatforms; j++)
                         {
                             if (plat[j].y < 0)
                                 maxPlatformY = std::min(maxPlatformY, plat[j].y);
@@ -493,7 +541,7 @@ int main()
         else if (state == PLAYING || state == PAUSED)
         {
             // Draw platforms first
-            for (int i = 0; i < PLATFORM_COUNT; i++)
+            for (int i = 0; i < activePlatforms; i++)
             {
                 sPlat.setPosition(Vector2f(plat[i].x, plat[i].y));
                 app.draw(sPlat);
