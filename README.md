@@ -20,6 +20,12 @@ Shahjalal University of Science and Technology (SUST)
 
 Doodle Jump is a classic arcade-style platformer game built with C++ and SFML (Simple and Fast Multimedia Library). The objective is simple yet challenging: jump as high as possible by landing on platforms while avoiding falling off the bottom of the screen.
 
+## Gameplay Preview
+
+The following animation demonstrates the core gameplay mechanics, controls, and visual flow of the game.
+
+![Doodle Jump Gameplay](GamePlay.gif)
+
 ## Game Mechanics
 
 ### Objective
