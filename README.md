@@ -76,6 +76,8 @@ Doodle_Jump/
 │   ├── doodle.png           # Player character sprite
 │   ├── resume.png           # Resume button image
 │   └── font.otf             # UI font file
+├── GamePlay.mp4             # Gameplay Video
+├── GamePlay.gif             # Gameplay GIF
 ├── highscore.txt            # Auto-generated high score file
 └── README.md                # This file
 ```
